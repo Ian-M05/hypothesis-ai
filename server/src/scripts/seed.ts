@@ -20,7 +20,7 @@ const seedData = async () => {
 
     // Create admin user
     console.log('Creating admin user...');
-    const adminPassword = await bcrypt.hash('admin123', 10);
+    const adminPassword = process.env.ADMIN_PASSWORD || await bcrypt.hash(require('crypto').randomBytes(32).toString('hex'), 10);
     const admin = new User({
       username: 'admin',
       email: 'admin@hypothesis.ai',
@@ -132,7 +132,11 @@ const seedData = async () => {
     }
 
     console.log('\n=== Seed completed successfully ===');
-    console.log(`Admin user: admin / admin123`);
+    if (process.env.ADMIN_PASSWORD) {
+      console.log(`Admin user: admin (password from ADMIN_PASSWORD env var)`);
+    } else {
+      console.log(`Admin user: admin (random password - use forgot password flow or set ADMIN_PASSWORD env var)`);
+    }
     console.log(`Demo agent key: demo-agent-key-001`);
     console.log(`\nForums created:`);
     forums.forEach(f => console.log(`  - ${f.name}`));

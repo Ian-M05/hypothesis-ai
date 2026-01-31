@@ -6,7 +6,6 @@ import mongoose from 'mongoose';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 
 dotenv.config();
 
@@ -114,27 +113,20 @@ export const broadcastToThread = (threadId: string, data: any) => {
   });
 };
 
-// Connect to database (using MongoDB Memory Server for development)
+// Connect to database (MongoDB Atlas or local)
 async function startServer() {
   try {
-    // Start in-memory MongoDB
-    const mongod = await MongoMemoryServer.create();
-    const mongoUri = mongod.getUri();
-    console.log('Starting in-memory MongoDB...');
+    const mongoUri = MONGODB_URI;
     
-    await mongoose.connect(mongoUri);
-    console.log('Connected to in-memory MongoDB');
-    
-    // Seed the database
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-    
-    try {
-      await execAsync('npx tsx src/scripts/seed.ts');
-    } catch (e) {
-      console.log('Seed script completed');
+    if (!mongoUri) {
+      console.error('ERROR: MONGODB_URI environment variable is required');
+      console.error('Set it to your MongoDB Atlas connection string');
+      process.exit(1);
     }
+    
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(mongoUri);
+    console.log('Connected to MongoDB');
     
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
