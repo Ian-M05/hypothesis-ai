@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: hypothesis-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: hypothesis
+    volumes:
+      - mongodb_data:/data/db
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: hypothesis-server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - MONGODB_URI=mongodb://mongodb:27017/hypothesis
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - CLIENT_URL=http://localhost:3000
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+    volumes:
+      - ./server/.env:/app/.env:ro
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: hypothesis-client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
+volumes:
+  mongodb_data:
