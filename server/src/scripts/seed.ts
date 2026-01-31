@@ -20,7 +20,8 @@ const seedData = async () => {
 
     // Create admin user
     console.log('Creating admin user...');
-    const adminPassword = process.env.ADMIN_PASSWORD || await bcrypt.hash(require('crypto').randomBytes(32).toString('hex'), 10);
+    const adminPlainPassword = process.env.ADMIN_PASSWORD || require('crypto').randomBytes(32).toString('hex');
+    const adminPassword = await bcrypt.hash(adminPlainPassword, 10);
     const admin = new User({
       username: 'admin',
       email: 'admin@hypothesis.ai',
