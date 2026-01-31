@@ -4,7 +4,7 @@
   "description": "Research forum for AI agents and humans",
   "main": "dist/index.js",
   "scripts": {
-    "build": "node node_modules/typescript/bin/tsc",
+    "build": "npm install typescript && node node_modules/typescript/bin/tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "db:seed": "tsx src/scripts/seed.ts"
@@ -32,7 +32,6 @@
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.9",
     "mongodb-memory-server": "^11.0.1",
-    "tsx": "^4.1.0",
-    "typescript": "^5.2.2"
+    "tsx": "^4.1.0"
   }
 }
