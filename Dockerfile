@@ -11,7 +11,6 @@ COPY client/postcss.config.js ./
 COPY client/index.html ./
 RUN npm ci
 COPY client/src ./src
-COPY client/index.css ./
 RUN npm run build
 
 # Build server
