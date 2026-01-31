@@ -78,7 +78,7 @@ export const createCommentSchema = z.object({
   evidence: z.array(z.string().max(2000)).max(20).optional(),
   comparisonWithExisting: z.string().max(5000).optional(),
   limitations: z.string().max(5000).optional(),
-  confidenceLevel: z.enum(['low', 'medium', 'high', 'very_high']).optional(),
+  confidenceLevel: z.number().min(0).max(100).optional(),
   methodology: z.string().max(3000).optional(),
   predictedOutcomes: z.string().max(3000).optional(),
   computationalRequirements: z.string().max(2000).optional(),
@@ -91,7 +91,7 @@ export const editCommentSchema = z.object({
   claim: z.string().max(1000).optional(),
   evidence: z.array(z.string().max(2000)).max(20).optional(),
   limitations: z.string().max(5000).optional(),
-  confidenceLevel: z.enum(['low', 'medium', 'high', 'very_high']).optional(),
+  confidenceLevel: z.number().min(0).max(100).optional(),
 });
 
 export const retractCommentSchema = z.object({

@@ -186,128 +186,36 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Request password reset
-router.post('/forgot-password', validate(requestPasswordResetSchema), async (req, res) => {
-  try {
-    const { email } = req.body;
-    const sanitizedEmail = sanitizeStrict(email.toLowerCase());
-
-    const user = await User.findOne({ email: sanitizedEmail });
-    if (!user) {
-      // Return success even if email not found (security best practice)
-      return res.json({ message: 'If an account exists, a reset email has been sent' });
-    }
-
-    if (!isEmailConfigured()) {
-      return res.status(503).json({ error: 'Email service not configured' });
-    }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    user.resetToken = resetToken;
-    user.resetExpires = resetExpires;
-    await user.save();
-
-    // Send email
-    await sendPasswordResetEmail(sanitizedEmail, resetToken);
-
-    res.json({ message: 'If an account exists, a reset email has been sent' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to send reset email' });
-  }
+// Request password reset - DISABLED for soft launch
+// router.post('/forgot-password', validate(requestPasswordResetSchema), async (req, res) => {
+//   ...
+// });
+router.post('/forgot-password', (req, res) => {
+  res.status(503).json({ error: 'Password reset disabled for soft launch' });
 });
 
-// Reset password with token
-router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
-  try {
-    const { token, password } = req.body;
-
-    const user = await User.findOne({
-      resetToken: token,
-      resetExpires: { $gt: new Date() },
-    });
-
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
-    }
-
-    // Hash new password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    user.passwordHash = passwordHash;
-    user.resetToken = undefined;
-    user.resetExpires = undefined;
-    await user.save();
-
-    // Send confirmation email
-    if (isEmailConfigured() && user.email) {
-      await sendPasswordChangedConfirmation(user.email);
-    }
-
-    res.json({ message: 'Password reset successful' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to reset password' });
-  }
+// Reset password with token - DISABLED for soft launch
+// router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
+//   ...
+// });
+router.post('/reset-password', (req, res) => {
+  res.status(503).json({ error: 'Password reset disabled for soft launch' });
 });
 
-// Request email verification
-router.post('/request-verification', authenticate, async (req: AuthRequest, res) => {
-  try {
-    const user = await User.findById(req.user._id);
-    if (!user || !user.email) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({ error: 'Email already verified' });
-    }
-
-    if (!isEmailConfigured()) {
-      return res.status(503).json({ error: 'Email service not configured' });
-    }
-
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    user.verificationToken = verificationToken;
-    user.verificationExpires = verificationExpires;
-    await user.save();
-
-    // Send email
-    await sendVerificationEmail(user.email, verificationToken);
-
-    res.json({ message: 'Verification email sent' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to send verification email' });
-  }
+// Request email verification - DISABLED for soft launch
+// router.post('/request-verification', authenticate, async (req: AuthRequest, res) => {
+//   ...
+// });
+router.post('/request-verification', authenticate, (req, res) => {
+  res.status(503).json({ error: 'Email verification disabled for soft launch' });
 });
 
-// Verify email with token
-router.post('/verify-email', validate(verifyEmailSchema), async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    const user = await User.findOne({
-      verificationToken: token,
-      verificationExpires: { $gt: new Date() },
-    });
-
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired verification token' });
-    }
-
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationExpires = undefined;
-    await user.save();
-
-    res.json({ message: 'Email verified successfully' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to verify email' });
-  }
+// Verify email with token - DISABLED for soft launch
+// router.post('/verify-email', validate(verifyEmailSchema), async (req, res) => {
+//   ...
+// });
+router.post('/verify-email', (req, res) => {
+  res.status(503).json({ error: 'Email verification disabled for soft launch' });
 });
 
 export default router;

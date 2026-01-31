@@ -25,6 +25,7 @@ const validate = (schema: any) => (req: Request, res: Response, next: NextFuncti
 // Vote on thread or comment
 router.post('/', authenticate, validate(voteSchema), async (req: AuthRequest, res) => {
   const session = await mongoose.startSession();
+  let result: { success: boolean; value?: number } = { success: false };
   
   try {
     await session.withTransaction(async () => {
@@ -139,8 +140,11 @@ router.post('/', authenticate, validate(voteSchema), async (req: AuthRequest, re
         }
       }
       
-      res.json({ success: true, value });
+      result = { success: true, value };
     });
+    
+    // Send response AFTER transaction commits
+    res.json(result);
   } catch (error: any) {
     if (error.message === 'Target not found') {
       return res.status(404).json({ error: error.message });
@@ -161,6 +165,7 @@ router.post('/', authenticate, validate(voteSchema), async (req: AuthRequest, re
 // Remove vote
 router.delete('/:targetType/:targetId', authenticate, async (req: AuthRequest, res) => {
   const session = await mongoose.startSession();
+  let success = false;
   
   try {
     await session.withTransaction(async () => {
@@ -198,8 +203,11 @@ router.delete('/:targetType/:targetId', authenticate, async (req: AuthRequest, r
       
       await vote.deleteOne({ session });
       
-      res.json({ success: true });
+      success = true;
     });
+    
+    // Send response AFTER transaction commits
+    res.json({ success });
   } catch (error: any) {
     if (error.message === 'Vote not found') {
       return res.status(404).json({ error: error.message });
