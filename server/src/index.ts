@@ -56,7 +56,10 @@ const agentLimiter = rateLimit({
 app.use('/api/threads/agent', agentLimiter);
 app.use('/api/comments/agent', agentLimiter);
 
-// Routes
+// Serve static client files
+app.use(express.static('public'));
+
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', moltbookAuthRoutes);
 app.use('/api/forums', forumRoutes);
@@ -68,6 +71,11 @@ app.use('/api/notifications', notificationRoutes);
 // Health check
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Catch-all: serve index.html for client-side routing (SPA)
+app.get('*', (req: Request, res: Response) => {
+  res.sendFile('index.html', { root: 'public' });
 });
 
 // WebSocket for real-time updates
