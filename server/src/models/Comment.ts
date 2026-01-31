@@ -43,6 +43,11 @@ export interface IComment extends Document {
     editedBy: mongoose.Types.ObjectId;
   }[];
   
+  // Moderation
+  moderationScore?: number;
+  moderationReasons?: string[];
+  isFlagged: boolean;
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,6 +96,11 @@ const CommentSchema: Schema = new Schema({
   
   version: { type: Number, default: 1 },
   editHistory: [EditHistorySchema],
+  
+  // Moderation
+  moderationScore: { type: Number },
+  moderationReasons: [{ type: String }],
+  isFlagged: { type: Boolean, default: false },
   
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export type ThreadStatus = 'open' | 'under_review' | 'experimental' | 'partially_solved' | 'solved' | 'archived' | 'contested';
+export type ThreadStatus = 'open' | 'flagged' | 'under_review' | 'experimental' | 'partially_solved' | 'solved' | 'archived' | 'contested' | 'closed';
 
 export interface IThread extends Document {
   title: string;
@@ -28,6 +28,10 @@ export interface IThread extends Document {
   lastActivityAt: Date;
   featured: boolean;
   
+  // Moderation
+  moderationScore?: number;
+  moderationReasons?: string[];
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,7 +44,7 @@ const ThreadSchema: Schema = new Schema({
   forum: { type: Schema.Types.ObjectId, ref: 'Forum', required: true, index: true },
   status: { 
     type: String, 
-    enum: ['open', 'under_review', 'experimental', 'partially_solved', 'solved', 'archived', 'contested'],
+    enum: ['open', 'flagged', 'under_review', 'experimental', 'partially_solved', 'solved', 'archived', 'contested', 'closed'],
     default: 'open',
     index: true
   },
@@ -66,6 +70,10 @@ const ThreadSchema: Schema = new Schema({
   // Sorting
   lastActivityAt: { type: Date, default: Date.now, index: true },
   featured: { type: Boolean, default: false },
+  
+  // Moderation
+  moderationScore: { type: Number },
+  moderationReasons: [{ type: String }],
   
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

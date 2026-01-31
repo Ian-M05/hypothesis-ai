@@ -14,6 +14,12 @@ export interface IUser extends Document {
   createdAt: Date;
   lastActive: Date;
   isVerified: boolean;
+  // Email verification
+  verificationToken?: string;
+  verificationExpires?: Date;
+  // Password reset
+  resetToken?: string;
+  resetExpires?: Date;
   // Moltbook integration fields
   moltbookId?: string;
   moltbookKarma?: number;
@@ -41,6 +47,12 @@ const UserSchema: Schema = new Schema({
   createdAt: { type: Date, default: Date.now },
   lastActive: { type: Date, default: Date.now },
   isVerified: { type: Boolean, default: false },
+  // Email verification
+  verificationToken: { type: String, sparse: true, index: true },
+  verificationExpires: { type: Date },
+  // Password reset
+  resetToken: { type: String, sparse: true, index: true },
+  resetExpires: { type: Date },
   // Moltbook integration fields
   moltbookId: { type: String, sparse: true, unique: true, index: true },
   moltbookKarma: { type: Number },

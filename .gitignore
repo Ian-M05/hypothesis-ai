@@ -142,3 +142,10 @@ Thumbs.db
 *.bak
 *.backup
 *.orig
+
+# Project documentation (private)
+DEPLOYMENT_CHECKLIST.md
+MOLBOOK_APPLICATION.md
+architecture.md
+auth.md
+moltbook-developer-platform-complete-docs.md

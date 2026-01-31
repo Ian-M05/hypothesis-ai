@@ -1,17 +1,40 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { Comment, Thread, Notification, User } from '../models';
 import { authenticate, AuthRequest, authenticateAgent } from '../middleware/auth';
+import {
+  createCommentSchema,
+  editCommentSchema,
+  retractCommentSchema,
+} from '../middleware/validation';
+import { sanitizeObject, commentSanitization } from '../middleware/sanitize';
+import { moderateContent } from '../services/moderation';
 
 const router = Router();
 
+// Validation middleware helper
+const validate = (schema: any) => (req: Request, res: Response, next: NextFunction) => {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: result.error.errors.map((e: any) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+  }
+  req.body = result.data;
+  next();
+};
+
 // Create comment (human or agent)
-router.post('/', authenticate, async (req: AuthRequest, res) => {
+router.post('/', authenticate, validate(createCommentSchema), async (req: AuthRequest, res) => {
   try {
+    const sanitized = sanitizeObject(req.body, commentSanitization);
     const {
       threadId,
       parentId,
       content,
-      // Structured research format
       claim,
       evidence,
       comparisonWithExisting,
@@ -20,7 +43,16 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       methodology,
       predictedOutcomes,
       computationalRequirements
-    } = req.body;
+    } = sanitized;
+    
+    // Content moderation check
+    const moderation = moderateContent(content, claim);
+    if (moderation.action === 'block') {
+      return res.status(400).json({
+        error: 'Content flagged as spam or inappropriate',
+        reasons: moderation.reasons,
+      });
+    }
     
     // Verify thread exists
     const thread = await Thread.findById(threadId);
@@ -52,7 +84,11 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       confidenceLevel,
       methodology,
       predictedOutcomes,
-      computationalRequirements
+      computationalRequirements,
+      // Moderation
+      moderationScore: moderation.score,
+      moderationReasons: moderation.reasons,
+      isFlagged: moderation.action === 'flag',
     });
     
     await comment.save();
@@ -105,15 +141,21 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
     const populatedComment = await Comment.findById(comment._id)
       .populate('author', 'username reputation isAgent expertise');
     
-    res.json(populatedComment);
+    const response: any = { comment: populatedComment };
+    if (moderation.action === 'flag') {
+      response.warning = 'Content flagged for review';
+    }
+    
+    res.json(response);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create comment' });
   }
 });
 
 // Agent API: Create comment
-router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
+router.post('/agent', authenticateAgent, validate(createCommentSchema), async (req: AuthRequest, res) => {
   try {
+    const sanitized = sanitizeObject(req.body, commentSanitization);
     const {
       threadId,
       parentId,
@@ -126,7 +168,16 @@ router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
       methodology,
       predictedOutcomes,
       computationalRequirements
-    } = req.body;
+    } = sanitized;
+    
+    // Content moderation check
+    const moderation = moderateContent(content, claim);
+    if (moderation.action === 'block') {
+      return res.status(400).json({
+        error: 'Content flagged as spam or inappropriate',
+        reasons: moderation.reasons,
+      });
+    }
     
     const thread = await Thread.findById(threadId);
     if (!thread) {
@@ -154,7 +205,11 @@ router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
       confidenceLevel,
       methodology,
       predictedOutcomes,
-      computationalRequirements
+      computationalRequirements,
+      // Moderation
+      moderationScore: moderation.score,
+      moderationReasons: moderation.reasons,
+      isFlagged: moderation.action === 'flag',
     });
     
     await comment.save();
@@ -181,9 +236,10 @@ router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
 });
 
 // Edit comment
-router.put('/:id', authenticate, async (req: AuthRequest, res) => {
+router.put('/:id', authenticate, validate(editCommentSchema), async (req: AuthRequest, res) => {
   try {
-    const { content, claim, evidence, limitations, confidenceLevel } = req.body;
+    const sanitized = sanitizeObject(req.body, commentSanitization);
+    const { content, claim, evidence, limitations, confidenceLevel } = sanitized;
     
     const comment = await Comment.findById(req.params.id);
     if (!comment) {
@@ -218,7 +274,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Retract comment
-router.post('/:id/retract', authenticate, async (req: AuthRequest, res) => {
+router.post('/:id/retract', authenticate, validate(retractCommentSchema), async (req: AuthRequest, res) => {
   try {
     const { reason } = req.body;
     

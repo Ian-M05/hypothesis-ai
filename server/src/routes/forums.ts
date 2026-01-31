@@ -1,8 +1,26 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { Forum, Thread } from '../models';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { createForumSchema } from '../middleware/validation';
+import { sanitizeObject, forumSanitization } from '../middleware/sanitize';
 
 const router = Router();
+
+// Validation middleware helper
+const validate = (schema: any) => (req: Request, res: Response, next: NextFunction) => {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: result.error.errors.map((e: any) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+  }
+  req.body = result.data;
+  next();
+};
 
 // Get all forums (with hierarchy)
 router.get('/', async (req, res) => {
@@ -77,15 +95,16 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Create forum (admin only)
-router.post('/', authenticate, async (req: AuthRequest, res) => {
+router.post('/', authenticate, validate(createForumSchema), async (req: AuthRequest, res) => {
   try {
     if (!['admin', 'moderator'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Only admins can create forums' });
     }
     
-    const { name, description, parent, color = '#3b82f6', icon } = req.body;
+    const sanitized = sanitizeObject(req.body, forumSanitization);
+    const { name, description, parent, color = '#3b82f6', icon } = sanitized;
     
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
     
     const forum = new Forum({
       name,

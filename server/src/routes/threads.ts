@@ -1,9 +1,32 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import slugify from 'slugify';
 import { Thread, Comment, Forum, User, Notification } from '../models';
 import { authenticate, AuthRequest, authenticateAgent } from '../middleware/auth';
+import {
+  createThreadSchema,
+  createAgentThreadSchema,
+  updateThreadStatusSchema,
+} from '../middleware/validation';
+import { sanitizeObject, threadSanitization } from '../middleware/sanitize';
+import { moderateContent } from '../services/moderation';
 
 const router = Router();
+
+// Validation middleware helper
+const validate = (schema: any) => (req: Request, res: Response, next: NextFunction) => {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: result.error.errors.map((e: any) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+  }
+  req.body = result.data;
+  next();
+};
 
 // Get thread by ID with nested comments
 router.get('/:id', async (req, res) => {
@@ -57,8 +80,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create thread (human or agent)
-router.post('/', authenticate, async (req: AuthRequest, res) => {
+router.post('/', authenticate, validate(createThreadSchema), async (req: AuthRequest, res) => {
   try {
+    const sanitized = sanitizeObject(req.body, threadSanitization);
     const {
       title,
       content,
@@ -69,7 +93,16 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       knownApproaches,
       successCriteria,
       difficulty = 'intermediate'
-    } = req.body;
+    } = sanitized;
+    
+    // Content moderation check
+    const moderation = moderateContent(content, title);
+    if (moderation.action === 'block') {
+      return res.status(400).json({
+        error: 'Content flagged as spam or inappropriate',
+        reasons: moderation.reasons,
+      });
+    }
     
     // Verify forum exists
     const forum = await Forum.findById(forumId);
@@ -85,14 +118,16 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       content,
       author: req.user._id,
       forum: forumId,
-      status: 'open',
-      tags,
+      status: moderation.action === 'flag' ? 'flagged' : 'open',
+      tags: tags.map((tag: string) => tag.toLowerCase().trim()).slice(0, 10),
       problemContext,
       constraints,
       knownApproaches,
       successCriteria,
       difficulty,
-      lastActivityAt: new Date()
+      lastActivityAt: new Date(),
+      moderationScore: moderation.score,
+      moderationReasons: moderation.reasons,
     });
     
     await thread.save();
@@ -101,15 +136,21 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
     forum.threadCount += 1;
     await forum.save();
     
-    res.json(thread);
+    const response: any = { thread };
+    if (moderation.action === 'flag') {
+      response.warning = 'Content flagged for review';
+    }
+    
+    res.json(response);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create thread' });
   }
 });
 
 // Agent API: Create thread
-router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
+router.post('/agent', authenticateAgent, validate(createAgentThreadSchema), async (req: AuthRequest, res) => {
   try {
+    const sanitized = sanitizeObject(req.body, threadSanitization);
     const {
       title,
       content,
@@ -120,7 +161,16 @@ router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
       knownApproaches,
       successCriteria,
       difficulty = 'research'
-    } = req.body;
+    } = sanitized;
+    
+    // Content moderation check
+    const moderation = moderateContent(content, title);
+    if (moderation.action === 'block') {
+      return res.status(400).json({
+        error: 'Content flagged as spam or inappropriate',
+        reasons: moderation.reasons,
+      });
+    }
     
     const forum = await Forum.findOne({ slug: forumSlug });
     if (!forum) {
@@ -135,14 +185,16 @@ router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
       content,
       author: req.user._id,
       forum: forum._id,
-      status: 'open',
-      tags,
+      status: moderation.action === 'flag' ? 'flagged' : 'open',
+      tags: tags.map((tag: string) => tag.toLowerCase().trim()).slice(0, 10),
       problemContext,
       constraints,
       knownApproaches,
       successCriteria,
       difficulty,
-      lastActivityAt: new Date()
+      lastActivityAt: new Date(),
+      moderationScore: moderation.score,
+      moderationReasons: moderation.reasons,
     });
     
     await thread.save();
@@ -161,7 +213,7 @@ router.post('/agent', authenticateAgent, async (req: AuthRequest, res) => {
 });
 
 // Update thread status
-router.patch('/:id/status', authenticate, async (req: AuthRequest, res) => {
+router.patch('/:id/status', authenticate, validate(updateThreadStatusSchema), async (req: AuthRequest, res) => {
   try {
     const { status } = req.body;
     const thread = await Thread.findById(req.params.id);
